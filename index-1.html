@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QlikBase Console</title>
+<style>
+:root{--bg:#f8f9fa;--c:#fff;--t:#202124;--m:#5f6368;--b:#dadce0;--p:#1a73e8;--pt:#fff;--h:#f1f3f4;--r:#d93025}
+@media(prefers-color-scheme:dark){:root{--bg:#131314;--c:#1e1f20;--t:#e3e3e3;--m:#9aa0a6;--b:#3c4043;--p:#8ab4f8;--pt:#202124;--h:#2a2b2d;--r:#f28b82}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,Roboto,sans-serif;background:var(--bg);color:var(--t)}
+header{position:sticky;top:0;z-index:5;height:56px;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--c);border-bottom:1px solid var(--b)}
+.logo{font-weight:600;font-size:18px;white-space:nowrap}
+select,input,textarea,button,.btn{font:inherit;padding:8px 12px;border-radius:8px;border:1px solid var(--b);background:var(--c);color:var(--t);max-width:100%}
+header select{flex:1;min-width:0}
+button,.btn{background:var(--p);color:var(--pt);border:0;cursor:pointer;margin:2px 4px 2px 0;display:inline-block}
+button.g,.btn.g{background:var(--h);color:var(--t)}button.r{background:var(--r);color:#fff}button.ic{background:none;color:var(--t);font-size:20px;padding:4px 8px}
+aside{position:fixed;top:56px;bottom:0;left:0;width:250px;background:var(--c);border-right:1px solid var(--b);padding:10px 0;transform:translateX(-100%);transition:.2s;z-index:4;overflow:auto}
+aside.open{transform:none}aside a{display:block;padding:11px 20px;cursor:pointer;color:var(--m);border-radius:0 24px 24px 0;margin-right:10px}
+aside a.on{background:var(--h);color:var(--p);font-weight:600}
+main{padding:16px;max-width:980px;margin:0 auto}
+@media(min-width:800px){aside{transform:none}main{margin-left:250px;max-width:none;padding:24px 32px}header .ic{display:none}}
+h1{font-size:22px;font-weight:500;margin:4px 0 12px}
+.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:16px;margin-bottom:14px}
+.hd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px}.grid .card{margin:0}.n{font-size:26px;color:var(--p)}
+.s{color:var(--m);font-size:12px;word-break:break-all}.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--b)}.row>div{flex:1;min-width:0}
+.tbl{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px 8px;border-top:1px solid var(--b);white-space:nowrap}th{color:var(--m);font-weight:500}
+.tag{background:var(--h);padding:2px 8px;border-radius:10px;font-size:11px}.bar{margin:6px 0}
+label{display:block;margin:10px 0 4px;color:var(--m);font-size:12px}input,textarea,select{width:100%}
+.tree{overflow-x:auto;font-family:ui-monospace,Menlo,monospace;font-size:13px}.nd{display:flex;align-items:center;gap:4px;padding:3px 0;white-space:nowrap}.nd:hover{background:var(--h)}
+.ar{width:16px;cursor:pointer;color:var(--m)}.k{font-weight:600}.v.string{color:#188038}.v.number{color:#1967d2}.v.boolean{color:#b06000}
+.ac{margin-left:auto;display:flex;gap:2px}.ac button{padding:0 8px;background:var(--h);color:var(--t);margin:0}
+.th{width:44px;height:44px;border-radius:8px;object-fit:cover;background:var(--h);display:flex;align-items:center;justify-content:center;flex:none}
+dialog{border:0;border-radius:14px;padding:18px;width:min(460px,92vw);background:var(--c);color:var(--t)}dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}.act{text-align:right;margin-top:14px}
+.empty{text-align:center;padding:40px 16px}#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:10px 18px;border-radius:8px;opacity:0;pointer-events:none;transition:.2s;z-index:9}#toast.on{opacity:1}
+.ubar{display:flex;align-items:center;gap:8px;padding:10px 14px}.ubar code{flex:1;overflow-x:auto;white-space:nowrap;font-size:13px}.ubar button{margin:0}
+.foot{color:var(--m);font-size:12px;text-align:center;margin:20px 0}
+</style></head><body>
+<header><button class="ic" onclick="$('#side').classList.toggle('open')">&#9776;</button><span class="logo">&#128293; QlikBase</span><select id="proj" onchange="S.cur=this.value;save();show()"></select><button onclick="newProj()">+ Project</button></header>
+<aside id="side"><nav id="nav"></nav></aside><main id="m"></main><dialog id="dlg"></dialog><div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s),T={};
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const enc=s=>encodeURIComponent(s).replace(/'/g,'%27'),dec=s=>decodeURIComponent(s);
+const rid=n=>{let s='';while(s.length<n)s+=Math.random().toString(36).slice(2);return s.slice(0,n)};
+const fmt=t=>new Date(t).toLocaleString(),pv=s=>{try{return JSON.parse(s)}catch(e){return s}};
+let S=null;try{S=JSON.parse(localStorage.qbc)}catch(e){}S=S||{cur:null,projects:{}};
+let tab='ov';const OPEN=new Set(['']);
+const save=()=>{localStorage.qbc=JSON.stringify(S)},P=()=>S.projects[S.cur];
+const toast=m=>{const e=$('#toast');e.textContent=m;e.className='on';setTimeout(()=>e.className='',2200)};
+const count=o=>o&&typeof o=='object'?Object.values(o).reduce((a,v)=>a+count(v),0):1;
+function modal(title,fields,ok){ok=ok||'Save';return new Promise(res=>{const d=$('#dlg');
+ d.innerHTML='<h3>'+esc(title)+'</h3>'+fields.map(f=>'<label>'+esc(f.label)+'</label>'+(f.type=='textarea'?'<textarea id="f_'+f.id+'" rows="'+(f.rows||6)+'">'+esc(f.val||'')+'</textarea>':f.type=='select'?'<select id="f_'+f.id+'">'+f.opts.map(o=>'<option>'+o+'</option>').join('')+'</select>':'<input id="f_'+f.id+'" type="'+(f.type||'text')+'" value="'+esc(f.val||'')+'">')).join('')+'<div class="act"><button class="g" id="dc">Cancel</button><button id="dk">'+ok+'</button></div>';
+ d.showModal();$('#dc').onclick=()=>{d.close();res(null)};d.oncancel=()=>res(null);
+ $('#dk').onclick=()=>{const o={};fields.forEach(f=>o[f.id]=$('#f_'+f.id).value);d.close();res(o)}})}
+/* ---- helpers for the database tree ---- */
+const getp=(t,p)=>{const v=p.reduce((a,k)=>a==null?null:a[k],t);return v==null?null:v};
+function setp(t,p,v){let a=t;p.slice(0,-1).forEach(k=>{if(!a[k]||typeof a[k]!='object')a[k]={};a=a[k]});const l=p[p.length-1];if(v===null)delete a[l];else a[l]=v;return t}
+function setv(path,v){const p=P();p.db=path.length?setp(p.db,path,v):(v&&typeof v=='object'?v:{});save();show()}
+/* ---- shell ---- */
+const NAV=[['ov','&#127968;','Project Overview'],['au','&#128101;','Authentication'],['db','&#128452;','Realtime Database'],['st','&#128193;','Storage'],['ms','&#128276;','Messaging'],['se','&#9881;','Project settings']];
+function shell(){const ps=Object.entries(S.projects);
+ $('#proj').innerHTML=ps.map(([i,p])=>'<option value="'+i+'"'+(i==S.cur?' selected':'')+'>'+esc(p.name)+'</option>').join('')||'<option>No project</option>';
+ $('#nav').innerHTML=NAV.map(n=>'<a class="'+(n[0]==tab?'on':'')+'" onclick="go(\''+n[0]+'\')">'+n[1]+' &nbsp;'+n[2]+'</a>').join('')}
+const go=t=>{tab=t;$('#side').classList.remove('open');show()};
+function show(){shell();if(!S.cur||!P()){$('#m').innerHTML='<div class="card empty"><h1>Welcome to QlikBase</h1><p class="s">Create your first project to get started.</p><button onclick="newProj()">Add project</button></div>';return}T[tab]()}
+async function newProj(){const r=await modal('Add project',[{id:'n',label:'Project name'}],'Create');if(!r||!r.n.trim())return;
+ const id=r.n.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+rid(5);
+ S.projects[id]={name:r.n.trim(),created:Date.now(),apps:[],db:{},users:[],notifs:[],srv:{url:'',key:''}};S.cur=id;tab='ov';save();show()}
+/* ---- overview ---- */
+T.ov=()=>{const p=P();$('#m').innerHTML='<h1>'+esc(p.name)+'</h1><div class="s" style="margin-bottom:12px">Project ID: '+S.cur+'</div><div class="grid">'+
+ [['Users',p.users.length],['Database nodes',count(p.db)-(p.db&&Object.keys(p.db).length?0:1)],['Messages',p.notifs.length],['Apps',p.apps.length]].map(x=>'<div class="card"><div class="n">'+x[1]+'</div><div class="s">'+x[0]+'</div></div>').join('')+'</div>'+
+ '<div class="card"><div class="hd"><b>Your apps</b><button onclick="newApp()">+ Add app</button></div>'+(p.apps.map(a=>'<div class="row"><div><b>'+esc(a.name)+'</b><div class="s">'+a.platform+' &middot; '+a.appId+'</div></div><button class="g" onclick="cfg(\''+a.id+'\')">Config</button><button class="g" onclick="delApp(\''+a.id+'\')">&#128465;</button></div>').join('')||'<div class="s">No apps yet. Add a web or mobile app to get its config.</div>')+'</div>'};
+async function newApp(){const r=await modal('Add app',[{id:'n',label:'App nickname'},{id:'pl',label:'Platform',type:'select',opts:['Web','Android','iOS']}],'Register app');if(!r||!r.n.trim())return;
+ const a={id:rid(6),name:r.n.trim(),platform:r.pl,appId:'1:'+Math.floor(Math.random()*9e11+1e11)+':'+r.pl.toLowerCase()+':'+rid(16),apiKey:'QB'+rid(32)};P().apps.push(a);save();show();cfg(a.id)}
+function cfg(id){const p=P(),a=p.apps.find(x=>x.id==id);if(!a)return;
+ const t='const qbConfig = {\n  apiKey: "'+a.apiKey+'",\n  projectId: "'+S.cur+'",\n  appId: "'+a.appId+'",\n  serverUrl: "'+(p.srv.url||'')+'"\n};';
+ modal('App config: '+a.name,[{id:'c',label:'Paste into your app',type:'textarea',val:t,rows:8}],'Copy').then(r=>{if(r){navigator.clipboard&&navigator.clipboard.writeText(t);toast('Copied')}})}
+function delApp(id){if(confirm('Delete this app?')){P().apps=P().apps.filter(a=>a.id!=id);save();show()}}
+/* ---- authentication ---- */
+async function sha(s){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return btoa(unescape(encodeURIComponent(s)))}}
+T.au=()=>{const p=P();$('#m').innerHTML='<h1>Authentication</h1><div class="card"><div class="hd"><b>Users ('+p.users.length+')</b><button onclick="addUser()">Add user</button></div><div class="tbl"><table><tr><th>Identifier</th><th>Created</th><th>User UID</th><th></th></tr>'+
+ p.users.map(u=>'<tr><td>'+esc(u.email)+(u.off?' <span class="tag">Disabled</span>':'')+'</td><td>'+fmt(u.created)+'</td><td class="s">'+u.uid+'</td><td><button class="g" onclick="tu(\''+u.uid+'\')">'+(u.off?'Enable':'Disable')+'</button><button class="g" onclick="du(\''+u.uid+'\')">&#128465;</button></td></tr>').join('')+'</table></div>'+(p.users.length?'':'<div class="s" style="margin-top:8px">No users yet.</div>')+'</div>'};
+async function addUser(){const r=await modal('Add user',[{id:'e',label:'Email'},{id:'p',label:'Password (min 6 chars)',type:'password'}],'Add user');if(!r)return;
+ const e=r.e.trim().toLowerCase();if(!e||r.p.length<6)return toast('Valid email and 6+ char password needed');
+ if(P().users.some(u=>u.email==e))return toast('Email already exists');
+ P().users.push({uid:rid(20),email:e,hash:await sha(r.p),created:Date.now(),off:false});save();show()}
+const tu=id=>{const u=P().users.find(x=>x.uid==id);u.off=!u.off;save();show()};
+const du=id=>{if(confirm('Delete user?')){P().users=P().users.filter(x=>x.uid!=id);save();show()}};
+/* ---- urls ---- */
+const base=()=>(P().srv.url||'').replace(/\/+$/,'');
+const dbUrl=()=>base()?base()+'/api/db/':'qb://'+S.cur+'-default-rtdb/';
+const stUrl=()=>base()?base()+'/api/storage/':'qb://'+S.cur+'.storage/';
+const cp=e=>{navigator.clipboard&&navigator.clipboard.writeText(dec(e));toast('Copied')};
+const ubar=u=>'<div class="card ubar"><code>'+esc(u)+'</code><button class="g" onclick="cp(\''+enc(u)+'\')">Copy</button></div>'+(base()?'':'<div class="s" style="margin:-6px 0 12px">Local mode. Set a Server URL in Project settings to get a real https link.</div>');
+/* ---- realtime database ---- */
+T.db=()=>{$('#m').innerHTML='<h1>Realtime Database</h1>'+ubar(dbUrl())+'<div class="bar"><button class="g" onclick="expDb()">Export JSON</button><button class="g" onclick="impDb()">Import JSON</button></div><div class="card tree">'+node(P().db,[],P().name.toLowerCase().replace(/\s+/g,'-'))+'</div><div class="s">Tip: open this page in two tabs, changes appear in both instantly.</div>'};
+function node(v,path,key){const ps=path.join('/'),isO=v&&typeof v=='object',open=OPEN.has(ps),e=enc(ps);
+ let h='<div class="nd" style="padding-left:'+path.length*18+'px"><span class="ar" onclick="tg(\''+e+'\')">'+(isO?(open?'&#9662;':'&#9656;'):'&bull;')+'</span><span class="k">'+esc(key)+'</span>'+(isO?(Object.keys(v).length?'':': <span class="s">{}</span>'):': <span class="v '+typeof v+'">'+esc(JSON.stringify(v))+'</span>')+
+ '<span class="ac"><button onclick="act(\'add\',\''+e+'\')">+</button><button onclick="act(\'edit\',\''+e+'\')">&#9998;</button>'+(path.length?'<button onclick="act(\'del\',\''+e+'\')">&#10005;</button>':'')+'</span></div>';
+ if(isO&&open)h+=Object.keys(v).map(k=>node(v[k],path.concat(k),k)).join('');return h}
+const tg=e=>{const s=dec(e);OPEN.has(s)?OPEN.delete(s):OPEN.add(s);show()};
+async function act(a,e){const ps=dec(e),path=ps?ps.split('/'):[],cur=getp(P().db,path);
+ if(a=='del'){if(confirm('Delete this node and its children?'))setv(path,null);return}
+ if(a=='edit'){const r=await modal('Edit value',[{id:'v',label:'Value (JSON or text)',type:'textarea',val:JSON.stringify(cur,null,2)}]);if(r)setv(path,pv(r.v));return}
+ const r=await modal('Add child',[{id:'k',label:'Name'},{id:'v',label:'Value (text, number, true/false or JSON)',type:'textarea',rows:4}],'Add');
+ if(!r||!r.k.trim()||/[\/.#$\[\]]/.test(r.k))return r&&toast('Invalid name');
+ if(cur!==null&&typeof cur!='object'){if(!confirm('This will replace the current value with a child node. Continue?'))return;setv(path,{})}
+ OPEN.add(ps);setv(path.concat(r.k.trim()),pv(r.v))}
+function dl(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'application/json'}));a.download=name;a.click()}
+const expDb=()=>dl(S.cur+'-database.json',JSON.stringify(P().db,null,2));
+async function impDb(){const r=await modal('Import JSON (replaces all data)',[{id:'j',label:'Paste JSON',type:'textarea',rows:10}],'Import');if(!r)return;try{const v=JSON.parse(r.j);if(!v||typeof v!='object')throw 0;setv([],v)}catch(e){toast('Invalid JSON')}}
+/* ---- storage (IndexedDB) ---- */
+const idb=()=>new Promise((ok,no)=>{const r=indexedDB.open('qbfiles',1);r.onupgradeneeded=()=>r.result.createObjectStore('f');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
+const fdo=async(m,f)=>{const d=await idb();return new Promise((ok,no)=>{const t=d.transaction('f',m),r=f(t.objectStore('f'));t.oncomplete=()=>ok(r&&r.result);t.onerror=()=>no(t.error)})};
+T.st=async()=>{const fs=((await fdo('readonly',s=>s.getAll()))||[]).filter(f=>f.pid==S.cur);
+ $('#m').innerHTML='<h1>Storage</h1>'+ubar(stUrl())+'<div class="card"><div class="hd"><b>Files ('+fs.length+')</b><label class="btn" style="margin:0">Upload file<input type="file" multiple hidden onchange="upl(this.files)"></label></div>'+
+ (fs.map(f=>'<div class="row">'+(f.type.indexOf('image/')==0?'<img class="th" src="'+URL.createObjectURL(f.blob)+'">':'<span class="th">&#128196;</span>')+'<div><b>'+esc(f.name)+'</b><div class="s">'+(f.size/1024).toFixed(1)+' KB &middot; '+fmt(f.time)+'</div></div><button class="g" onclick="dlf(\''+enc(f.name)+'\')">Download</button><button class="g" onclick="rmf(\''+enc(f.name)+'\')">&#128465;</button></div>').join('')||'<div class="s">No files yet.</div>')+'</div>'};
+async function upl(fl){for(const f of fl)await fdo('readwrite',s=>s.put({pid:S.cur,name:f.name,type:f.type||'',size:f.size,blob:f,time:Date.now()},S.cur+'/'+f.name));toast('Uploaded');T.st()}
+async function dlf(e){const f=await fdo('readonly',s=>s.get(S.cur+'/'+dec(e)));if(!f)return;const a=document.createElement('a');a.href=URL.createObjectURL(f.blob);a.download=f.name;a.click()}
+async function rmf(e){if(confirm('Delete file?')){await fdo('readwrite',s=>s.delete(S.cur+'/'+dec(e)));T.st()}}
+/* ---- messaging ---- */
+T.ms=()=>{const p=P();$('#m').innerHTML='<h1>Messaging</h1><div class="card"><b>New notification</b><label>Title</label><input id="nt"><label>Message</label><textarea id="nb" rows="3"></textarea><label>Target</label><select id="ng"><option>All users</option><option>Topic: news</option></select><div class="bar"><button onclick="sendN()">Send</button><button class="g" onclick="window.Notification?Notification.requestPermission().then(r=>toast(\'Permission: \'+r)):toast(\'Not supported\')">Enable browser alerts</button></div></div>'+
+ '<div class="card"><b>History</b>'+(p.notifs.map(n=>'<div class="row"><div><b>'+esc(n.title)+'</b><div class="s">'+esc(n.body)+'</div></div><div class="s">'+esc(n.target)+'<br>'+fmt(n.time)+'</div></div>').join('')||'<div class="s">No messages yet.</div>')+'</div>'};
+function sendN(){const t=$('#nt').value.trim(),b=$('#nb').value.trim();if(!t&&!b)return toast('Write something first');
+ P().notifs.unshift({id:rid(8),title:t,body:b,target:$('#ng').value,time:Date.now()});save();
+ try{if(window.Notification&&Notification.permission=='granted')new Notification(t,{body:b})}catch(e){}toast('Sent');show()}
+/* ---- settings ---- */
+T.se=()=>{const p=P();$('#m').innerHTML='<h1>Project settings</h1><div class="card"><label>Project name</label><input id="sn" value="'+esc(p.name)+'"><label>Project ID</label><input value="'+S.cur+'" readonly><button style="margin-top:10px" onclick="P().name=$(\'#sn\').value.trim()||P().name;save();show();toast(\'Saved\')">Save</button></div>'+
+ '<div class="card"><b>Backend server</b><div class="s">Local mode is on: all data stays on this device and works offline. When your server is ready, paste its URL and API key here.</div><label>Server URL</label><input id="su" value="'+esc(p.srv.url)+'"><label>API key</label><input id="sk" value="'+esc(p.srv.key)+'"><button style="margin-top:10px" onclick="P().srv={url:$(\'#su\').value.trim(),key:$(\'#sk\').value.trim()};save();toast(\'Saved\')">Save</button></div>'+
+ '<div class="card"><b>Data</b><div class="bar"><button class="g" onclick="dl(S.cur+\'-backup.json\',JSON.stringify(P()))">Export project</button><button class="r" onclick="delProj()">Delete project</button></div></div>'};
+function delProj(){if(confirm('Delete this project and all its data?')){delete S.projects[S.cur];S.cur=Object.keys(S.projects)[0]||null;tab='ov';save();show()}}
+addEventListener('storage',e=>{if(e.key=='qbc'&&e.newValue){S=JSON.parse(e.newValue);show()}});
+show();
+</script>
+<div class="foot">QlikBase Console &middot; local mode &middot; works offline</div>
+</body></html>
