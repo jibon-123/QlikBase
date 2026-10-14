@@ -1,0 +1,71 @@
+<!-- ===== QlikBase: index.html-এর <head> বা <body>-এর একদম শুরুতে পেস্ট করুন ===== -->
+<script>
+// শুধু GitHub দিয়ে চালাতে BASE ফাঁকা রাখুন (ডাটা ফোনেই থাকবে, অফলাইনে কাজ করবে)।
+// সার্ভারের সাথে সিঙ্ক চাইলে Termux সার্ভারের লিংক ও API Key বসান।
+const BASE = '';   // যেমন 'https://xxxx.trycloudflare.com'
+const KEY  = '';   // ড্যাশবোর্ডের API Key
+window.qb = (function () {
+  const H = { 'x-api-key': KEY, 'content-type': 'application/json' };
+  const ls = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('qb_' + k)); localStorage.setItem('qb_' + k, JSON.stringify(v)); } catch (e) { return null; } };
+  const parts = p => p.split('/').filter(Boolean);
+  const getp = (t, p) => p.reduce((a, k) => (a == null ? null : a[k]), t) ?? null;
+  const setp = (t, p, v, merge) => {
+    if (!p.length) return v;
+    t = t && typeof t === 'object' ? t : {};
+    let a = t;
+    p.slice(0, -1).forEach(k => { if (!a[k] || typeof a[k] !== 'object') a[k] = {}; a = a[k]; });
+    const l = p[p.length - 1];
+    if (v === null) delete a[l];
+    else if (merge && a[l] && typeof a[l] === 'object') Object.assign(a[l], v);
+    else a[l] = v;
+    return t;
+  };
+  const mirror = (p, v, merge) => ls('tree', setp(ls('tree') || {}, parts(p), v, merge));
+  const fns = []; let busy = false;
+  async function sync() {
+    if (!BASE) { ls('queue', []); return true; }
+    if (busy) return false;
+    busy = true;
+    const q = ls('queue') || []; let ok = true;
+    while (q.length) {
+      const w = q[0];
+      try { const r = await fetch(BASE + '/api/db/' + w.p, { method: w.m, headers: H, body: w.b }); if (r.status >= 500) throw 0; }
+      catch (e) { ok = false; break; }
+      q.shift(); ls('queue', q);
+    }
+    busy = false;
+    if (ok) fns.forEach(f => f());
+    return ok;
+  }
+  async function write(p, m, v) {
+    p = parts(p).join('/');
+    mirror(p, m === 'DELETE' ? null : v, m === 'PATCH');
+    const q = ls('queue') || [];
+    q.push({ p, m, b: m === 'DELETE' ? undefined : JSON.stringify(v) });
+    ls('queue', q);
+    return sync();
+  }
+  addEventListener('online', sync); setInterval(sync, 15000); sync();
+  return {
+    async get(p = '') {
+      if (!BASE) return getp(ls('tree'), parts(p));
+      if ((ls('queue') || []).length) await sync();
+      try {
+        const r = await fetch(BASE + '/api/db/' + parts(p).join('/'), { headers: H });
+        if (!r.ok) throw 0;
+        const v = await r.json();
+        if (!(ls('queue') || []).length) mirror(p, v);
+        return v;
+      } catch (e) { return getp(ls('tree'), parts(p)); }
+    },
+    set: (p, v) => write(p, 'PUT', v),
+    update: (p, v) => write(p, 'PATCH', v),
+    remove: p => write(p, 'DELETE'),
+    add(p, v) { const k = Date.now().toString(36) + Math.random().toString(36).slice(2, 5); write(p + '/' + k, 'PUT', v); return k; },
+    pending: () => (ls('queue') || []).length,
+    onSync: f => fns.push(f)
+  };
+})();
+// ব্যবহার: qb.add('orders',{total:500}); qb.get('orders').then(console.log);
+</script>
+<!-- ===== শেষ ===== -->
